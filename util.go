@@ -1,12 +1,11 @@
-
 package mp4
 
 import (
+	"bytes"
+	"fmt"
 	"io"
 	"log"
 	"os"
-	"bytes"
-	"fmt"
 	"strings"
 )
 
@@ -16,7 +15,7 @@ func (l logger) Printf(format string, v ...interface{}) {
 	str := fmt.Sprintf(format, v...)
 	switch {
 	case strings.HasPrefix(str, "parse") && l >= 1,
-			 strings.HasPrefix(str, "read") && l >= 1:
+		strings.HasPrefix(str, "read") && l >= 1:
 		l2.Println(str)
 	default:
 		if l >= 1 {
@@ -26,7 +25,7 @@ func (l logger) Printf(format string, v ...interface{}) {
 }
 
 var (
-	l = logger(0)
+	l  = logger(0)
 	l2 *log.Logger
 )
 
@@ -35,21 +34,21 @@ func init() {
 }
 
 type mp4trk struct {
-	cc4 string
-	keyFrames, newKeyFrames []int
+	cc4                         string
+	keyFrames, newKeyFrames     []int
 	sampleSizes, newSampleSizes []int
-	chunkOffs, newChunkOffs []int64
-	stts, newStts []mp4stts
-	stsc, newStsc []mp4stsc
-	index []mp4index
-	extra []byte
-	offStart int64
-	mdatSize int
-	timeScale int
-	dur int
-	i int
-	newIdx int
-	codec, idx int
+	chunkOffs, newChunkOffs     []int64
+	stts, newStts               []mp4stts
+	stsc, newStsc               []mp4stsc
+	index                       []mp4index
+	extra                       []byte
+	offStart                    int64
+	mdatSize                    int
+	timeScale                   int
+	dur                         int
+	i                           int
+	newIdx                      int
+	codec, idx                  int
 }
 
 type mp4stsc struct {
@@ -58,9 +57,9 @@ type mp4stsc struct {
 
 type mp4index struct {
 	ts, size int
-	off int64
-	key bool
-	pos float32
+	off      int64
+	key      bool
+	pos      float32
 }
 
 type mp4stts struct {
@@ -68,28 +67,28 @@ type mp4stts struct {
 }
 
 type mp4atom struct {
-	tag string
-	data []byte
-	trk *mp4trk
+	tag    string
+	data   []byte
+	trk    *mp4trk
 	childs []*mp4atom
 }
 
 type mp4 struct {
-	atom *mp4atom
-	trk []*mp4trk
+	atom       *mp4atom
+	trk        []*mp4trk
 	vtrk, atrk *mp4trk
-	Dur, Pos float32
-	W, H int
-	rat *os.File
-	AACCfg []byte
-	PPS []byte
-	logindent int
+	Dur, Pos   float32
+	W, H       int
+	rat        *os.File
+	AACCfg     []byte
+	PPS        []byte
+	logindent  int
 
-	durts int
+	durts     int
 	timeScale int
 
-	mdatOff int64
-	w, w2 *os.File
+	mdatOff   int64
+	w, w2     *os.File
 	tmp, path string
 }
 
@@ -111,7 +110,7 @@ func ReadInt(r io.Reader, n int) (ret int, err error) {
 func WriteInt(r io.Writer, v int, n int) {
 	b := make([]byte, n)
 	for i := 0; i < n; i++ {
-		b[n-i-1] = byte(v&0xff)
+		b[n-i-1] = byte(v & 0xff)
 		v >>= 8
 	}
 	r.Write(b)
@@ -129,7 +128,7 @@ func WriteTag(w io.Writer, tag string, cb func(w io.Writer)) {
 	w.Write(b.Bytes())
 }
 
-func ReadAll(r io.Reader) ([]byte) {
+func ReadAll(r io.Reader) []byte {
 	var b bytes.Buffer
 	io.Copy(&b, r)
 	return b.Bytes()
@@ -157,4 +156,3 @@ func (m *mp4) Close() {
 		m.closeWriter()
 	}
 }
-

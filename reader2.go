@@ -1,25 +1,25 @@
-
 package mp4
 
 import (
-	"github.com/go-av/av"
 	"bytes"
-	"os"
-	"io"
 	"errors"
+	"io"
+	"os"
+
+	"github.com/nareix/av"
 )
 
 func binSearch(a []mp4index, pos float32) int {
 	l := 0
-	r := len(a)-1
-	for ; l < r-1; {
+	r := len(a) - 1
+	for l < r-1 {
 		m := (l + r) / 2
 		if pos < a[m].pos {
 			r = m
 		} else {
 			l = m
 		}
-	//	l.Printf(" at %d pos %f\n", m, a[m].pos)
+		//	l.Printf(" at %d pos %f\n", m, a[m].pos)
 	}
 	return l
 }
@@ -30,7 +30,7 @@ func searchIndex(pos float32, trk *mp4trk, key bool) (ret int) {
 		b := trk.index
 		for i := 0; i < len(a)-1; i++ {
 			if b[a[i]-1].pos < pos && pos < b[a[i+1]-1].pos {
-				ret = a[i]-1
+				ret = a[i] - 1
 				return
 			}
 		}
@@ -46,7 +46,7 @@ func testSearchIndex() {
 		a[i].pos = float32(i)
 	}
 	for i := -4; i < 14; i++ {
-		pos := float32(i)+0.1
+		pos := float32(i) + 0.1
 		//l.Printf("seek: search(%f)", pos)
 		binSearch(a, pos)
 		//l.Printf("seek: =%d", r)
@@ -85,9 +85,9 @@ func (m *mp4) readTo(trks []*mp4trk, end float32) (ret []*av.Packet, pos float32
 		b := make([]byte, mt.index[mt.i].size)
 		m.rat.ReadAt(b, mt.index[mt.i].off)
 		ret = append(ret, &av.Packet{
-			Codec:mt.codec, Key:mt.index[mt.i].key,
-			Pos:mt.index[mt.i].pos, Data:b,
-			Ts:int64(mt.index[mt.i].ts)*1000000/int64(mt.timeScale),
+			Codec: mt.codec, Key: mt.index[mt.i].key,
+			Pos: mt.index[mt.i].pos, Data: b,
+			//Ts: int64(mt.index[mt.i].ts) * 1000000 / int64(mt.timeScale),
 		})
 		mt.i++
 	}
@@ -112,7 +112,7 @@ func (m *mp4) GetH() int {
 
 func (m *mp4) ReadDur(dur float32) (ret []*av.Packet) {
 	l.Printf("read: dur %f", dur)
-	ret, m.Pos = m.readTo([]*mp4trk{m.vtrk, m.atrk}, m.Pos + dur)
+	ret, m.Pos = m.readTo([]*mp4trk{m.vtrk, m.atrk}, m.Pos+dur)
 	l.Printf("read: got %d packets", len(ret))
 	return
 }
@@ -150,7 +150,7 @@ func Open(path string) (m *mp4, err error) {
 func (m *mp4) wrAtom(w io.Writer, a *mp4atom) {
 	if len(a.childs) > 0 {
 		if a.tag != "" {
-			WriteTag(w, a.tag, func (w io.Writer) {
+			WriteTag(w, a.tag, func(w io.Writer) {
 				for _, ca := range a.childs {
 					m.wrAtom(w, ca)
 				}
@@ -184,13 +184,12 @@ func (m *mp4) wrAtom(w io.Writer, a *mp4atom) {
 		case "mvhd":
 			m.writeMVHD(w)
 		default:
-			WriteTag(w, a.tag, func (w io.Writer) {
+			WriteTag(w, a.tag, func(w io.Writer) {
 				w.Write(a.data)
 			})
 		}
 	}
 }
-
 
 func (m *mp4) DumpTest(outpath string) (err error) {
 	// Need modify atoms:
@@ -201,7 +200,7 @@ func (m *mp4) DumpTest(outpath string) (err error) {
 	//  stss: keyFrames
 
 	pos := float32(120)
-	minOffStart := int64(2)<<40
+	minOffStart := int64(2) << 40
 
 	m.vtrk.newIdx = searchIndex(pos, m.vtrk, true)
 	newpos := m.vtrk.index[m.vtrk.newIdx].pos
@@ -230,7 +229,7 @@ func (m *mp4) DumpTest(outpath string) (err error) {
 
 		m.log("dur %d -> %d", t.dur, t.dur-t.index[ii].ts)
 		t.dur -= t.index[ii].ts
-		m.Dur = float32(t.dur)/float32(t.timeScale)
+		m.Dur = float32(t.dur) / float32(t.timeScale)
 
 		if t.offStart < minOffStart {
 			minOffStart = t.offStart
@@ -246,7 +245,7 @@ func (m *mp4) DumpTest(outpath string) (err error) {
 			}
 			t.newKeyFrames = t.keyFrames[ik:]
 			for i := 1; i < len(t.newKeyFrames); i++ {
-				t.newKeyFrames[i] -= t.newKeyFrames[0]-1
+				t.newKeyFrames[i] -= t.newKeyFrames[0] - 1
 			}
 			t.newKeyFrames[0] = 1
 			m.log("keyFrames %v", t.newKeyFrames[:10])
@@ -272,7 +271,7 @@ func (m *mp4) DumpTest(outpath string) (err error) {
 		cnt = 0
 		ci := 0
 		for ki, _ := range t.chunkOffs {
-			for ; ci+1 < len(t.stsc) && ki+1 == t.stsc[ci+1].first ; {
+			for ci+1 < len(t.stsc) && ki+1 == t.stsc[ci+1].first {
 				ci++
 			}
 			cnt += t.stsc[ci].cnt
@@ -293,8 +292,8 @@ func (m *mp4) DumpTest(outpath string) (err error) {
 			copy(t.newStsc[1:], t.stsc[iStsc:])
 			t.newStsc[0] = t.newStsc[1]
 			t.newStsc[0].cnt -= ii - cnt
-			t.newStsc[0].first = iStco+1
-			t.newStsc[1].first = iStco+2
+			t.newStsc[0].first = iStco + 1
+			t.newStsc[1].first = iStco + 2
 		}
 		for i := 0; i < len(t.newStsc); i++ {
 			t.newStsc[i].first -= iStco
@@ -316,7 +315,7 @@ func (m *mp4) DumpTest(outpath string) (err error) {
 	m.log("gen file")
 	var b bytes.Buffer
 	m.wrAtom(&b, m.atom)
-	newOff := int64(b.Len())+8
+	newOff := int64(b.Len()) + 8
 	m.log("newOff %d minOff %d", newOff, minOffStart)
 	st, _ := m.rat.Stat()
 	newMdatSize := st.Size() - minOffStart
@@ -339,4 +338,3 @@ func (m *mp4) DumpTest(outpath string) (err error) {
 func (m *mp4) closeReader() {
 	m.rat.Close()
 }
-
