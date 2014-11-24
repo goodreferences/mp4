@@ -51,15 +51,22 @@ type mp4trk struct {
 	codec, idx                  int
 }
 
+func (t *mp4trk) Index() []mp4index {
+	return t.index
+}
+func (t *mp4trk) Extra() []byte {
+	return t.extra
+}
+
 type mp4stsc struct {
 	first, cnt, id int
 }
 
 type mp4index struct {
-	ts, size int
-	off      int64
-	key      bool
-	pos      float32
+	Ts, Size int
+	Off      int64
+	Key      bool
+	Pos      float32
 }
 
 type mp4stts struct {
@@ -75,7 +82,7 @@ type mp4atom struct {
 
 type mp4 struct {
 	atom       *mp4atom
-	trk        []*mp4trk
+	Trk        []*mp4trk
 	vtrk, atrk *mp4trk
 	Dur, Pos   float32
 	W, H       int

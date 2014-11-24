@@ -14,7 +14,7 @@ func binSearch(a []mp4index, pos float32) int {
 	r := len(a) - 1
 	for l < r-1 {
 		m := (l + r) / 2
-		if pos < a[m].pos {
+		if pos < a[m].Pos {
 			r = m
 		} else {
 			l = m
@@ -29,7 +29,7 @@ func searchIndex(pos float32, trk *mp4trk, key bool) (ret int) {
 		a := trk.keyFrames
 		b := trk.index
 		for i := 0; i < len(a)-1; i++ {
-			if b[a[i]-1].pos < pos && pos < b[a[i+1]-1].pos {
+			if b[a[i]-1].Pos < pos && pos < b[a[i+1]-1].Pos {
 				ret = a[i] - 1
 				return
 			}
@@ -43,7 +43,7 @@ func searchIndex(pos float32, trk *mp4trk, key bool) (ret int) {
 func testSearchIndex() {
 	a := make([]mp4index, 10)
 	for i, _ := range a {
-		a[i].pos = float32(i)
+		a[i].Pos = float32(i)
 	}
 	for i := -4; i < 14; i++ {
 		pos := float32(i) + 0.1
@@ -56,10 +56,10 @@ func testSearchIndex() {
 func (m *mp4) SeekKey(pos float32) {
 	l.Printf("seek: %f", pos)
 	m.vtrk.i = searchIndex(pos, m.vtrk, true)
-	l.Printf("seek: V: %f", m.vtrk.index[m.vtrk.i].pos)
+	l.Printf("seek: V: %f", m.vtrk.index[m.vtrk.i].Pos)
 	if m.atrk != nil {
 		m.atrk.i = searchIndex(pos, m.atrk, false)
-		l.Printf("seek: A: %f", m.atrk.index[m.atrk.i].pos)
+		l.Printf("seek: A: %f", m.atrk.index[m.atrk.i].Pos)
 	}
 }
 
@@ -70,7 +70,7 @@ func (m *mp4) readTo(trks []*mp4trk, end float32) (ret []*av.Packet, pos float32
 			if t.i >= len(t.index) {
 				continue
 			}
-			if mt == nil || t.index[t.i].pos < mt.index[mt.i].pos {
+			if mt == nil || t.index[t.i].Pos < mt.index[mt.i].Pos {
 				mt = t
 			}
 		}
@@ -78,15 +78,15 @@ func (m *mp4) readTo(trks []*mp4trk, end float32) (ret []*av.Packet, pos float32
 			//l.Printf("mt == nil")
 			break
 		}
-		pos = mt.index[mt.i].pos
+		pos = mt.index[mt.i].Pos
 		if pos >= end {
 			break
 		}
-		b := make([]byte, mt.index[mt.i].size)
-		m.rat.ReadAt(b, mt.index[mt.i].off)
+		b := make([]byte, mt.index[mt.i].Size)
+		m.rat.ReadAt(b, mt.index[mt.i].Off)
 		ret = append(ret, &av.Packet{
-			Codec: mt.codec, Key: mt.index[mt.i].key,
-			Pos: mt.index[mt.i].pos, Data: b,
+			Codec: mt.codec, Key: mt.index[mt.i].Key,
+			Pos: mt.index[mt.i].Pos, Data: b,
 			//Ts: int64(mt.index[mt.i].ts) * 1000000 / int64(mt.timeScale),
 		})
 		mt.i++
@@ -134,7 +134,7 @@ func Open(path string) (m *mp4, err error) {
 	m.rat = r
 	m.atom = &mp4atom{}
 	m.readAtom(r, 0, nil, m.atom)
-	for _, t := range m.trk {
+	for _, t := range m.Trk {
 		m.parseTrk(t)
 	}
 	if m.vtrk == nil {
@@ -203,11 +203,11 @@ func (m *mp4) DumpTest(outpath string) (err error) {
 	minOffStart := int64(2) << 40
 
 	m.vtrk.newIdx = searchIndex(pos, m.vtrk, true)
-	newpos := m.vtrk.index[m.vtrk.newIdx].pos
+	newpos := m.vtrk.index[m.vtrk.newIdx].Pos
 	m.log("adjust pos %v -> %v", pos, newpos)
 	pos = newpos
 
-	for _, t := range m.trk {
+	for _, t := range m.Trk {
 		m.logindent = 0
 		m.log("trk")
 		m.logindent = 1
@@ -222,13 +222,13 @@ func (m *mp4) DumpTest(outpath string) (err error) {
 			}
 		}
 
-		t.offStart = t.index[ii].off
+		t.offStart = t.index[ii].Off
 		t.newSampleSizes = t.sampleSizes[ii:]
 		m.log("ii %d/%d", ii, len(t.sampleSizes))
 		m.log("offStart %d", t.offStart)
 
-		m.log("dur %d -> %d", t.dur, t.dur-t.index[ii].ts)
-		t.dur -= t.index[ii].ts
+		m.log("dur %d -> %d", t.dur, t.dur-t.index[ii].Ts)
+		t.dur -= t.index[ii].Ts
 		m.Dur = float32(t.dur) / float32(t.timeScale)
 
 		if t.offStart < minOffStart {
@@ -270,7 +270,7 @@ func (m *mp4) DumpTest(outpath string) (err error) {
 		iStco := 0
 		cnt = 0
 		ci := 0
-		for ki, _ := range t.chunkOffs {
+		for ki := range t.chunkOffs {
 			for ci+1 < len(t.stsc) && ki+1 == t.stsc[ci+1].first {
 				ci++
 			}

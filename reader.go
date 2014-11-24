@@ -266,7 +266,7 @@ func (m *mp4) readAtom(r io.ReadSeeker, indent int, trk *mp4trk, atom *mp4atom) 
 			m.readAtom(br, indent+1, trk, curatom)
 		case "trak":
 			newtrk := &mp4trk{}
-			m.trk = append(m.trk, newtrk)
+			m.Trk = append(m.Trk, newtrk)
 			m.readAtom(br, indent+1, newtrk, curatom)
 		case "stsd":
 			m.readSTSD(br, indent, trk)
@@ -337,7 +337,7 @@ func (m *mp4) parseTrk(trk *mp4trk) {
 			size := trk.sampleSizes[i]
 			pos := float32(ts) / float32(trk.timeScale)
 			trk.index[i] = mp4index{
-				ts: ts, off: off, size: size, pos: pos,
+				Ts: ts, Off: off, Size: size, Pos: pos,
 			}
 			if false {
 				m.log(
@@ -352,7 +352,7 @@ func (m *mp4) parseTrk(trk *mp4trk) {
 
 			if fi < len(trk.keyFrames) && i+1 == trk.keyFrames[fi] {
 				fi++
-				trk.index[i].key = true
+				trk.index[i].Key = true
 			}
 
 			i++

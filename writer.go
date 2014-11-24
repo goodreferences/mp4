@@ -379,7 +379,7 @@ func (m *mp4) writeMVHD(w io.Writer) {
 func (m *mp4) writeMOOV(w io.Writer) {
 	WriteTag(w, "moov", func(w io.Writer) {
 		m.writeMVHD(w)
-		for _, t := range m.trk {
+		for _, t := range m.Trk {
 			m.writeTRAK(w, t)
 		}
 	})
@@ -442,7 +442,7 @@ func Create(path string) (m *mp4, err error) {
 
 func (m *mp4) Write(p *av.Packet) {
 	var ft *mp4trk
-	for _, t := range m.trk {
+	for _, t := range m.Trk {
 		if t.codec == p.Codec && t.idx == p.Idx {
 			ft = t
 			break
@@ -450,7 +450,7 @@ func (m *mp4) Write(p *av.Packet) {
 	}
 	if ft == nil {
 		ft = newTrk(p.Codec, p.Idx)
-		m.trk = append(m.trk, ft)
+		m.Trk = append(m.Trk, ft)
 	}
 	m.trkAdd(ft, p)
 }
@@ -464,7 +464,7 @@ func (m *mp4) WriteAAC(p []byte) {
 }
 
 func (m *mp4) closeWriter() {
-	l.Printf("  ntrk %v", len(m.trk))
+	l.Printf("  ntrk %v", len(m.Trk))
 
 	var b bytes.Buffer
 
