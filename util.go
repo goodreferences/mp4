@@ -57,6 +57,9 @@ func (t *mp4trk) Index() []mp4index {
 func (t *mp4trk) Extra() []byte {
 	return t.extra
 }
+func (t *mp4trk) Codec() int {
+	return t.codec
+}
 
 type mp4stsc struct {
 	first, cnt, id int
@@ -86,7 +89,7 @@ type mp4 struct {
 	vtrk, atrk *mp4trk
 	Dur, Pos   float32
 	W, H       int
-	rat        *os.File
+	rat        mp4SourceData
 	AACCfg     []byte
 	PPS        []byte
 	logindent  int
@@ -97,6 +100,10 @@ type mp4 struct {
 	mdatOff   int64
 	w, w2     *os.File
 	tmp, path string
+}
+
+func (m *mp4) Source() mp4SourceData {
+	return m.rat
 }
 
 func ReadUint(r io.Reader, n int) (ret uint, err error) {

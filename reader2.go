@@ -42,7 +42,7 @@ func searchIndex(pos float32, trk *mp4trk, key bool) (ret int) {
 
 func testSearchIndex() {
 	a := make([]mp4index, 10)
-	for i, _ := range a {
+	for i := range a {
 		a[i].Pos = float32(i)
 	}
 	for i := -4; i < 14; i++ {
@@ -125,6 +125,28 @@ func (m *mp4) dumpAtoms(a *mp4atom, indent int) {
 	}
 }
 
+type mp4SourceData interface {
+	io.ReadSeeker
+	io.ReaderAt
+}
+
+func NewMp4(r *bytes.Reader) (m *mp4, err error) {
+	m = &mp4{}
+
+	m.rat = mp4SourceData(r)
+	m.atom = &mp4atom{}
+	m.readAtom(r, 0, nil, m.atom)
+	for _, t := range m.Trk {
+		m.parseTrk(t)
+	}
+	if m.vtrk == nil {
+		err = errors.New("no video track")
+		return
+	}
+	m.Dur = float32(m.vtrk.dur) / float32(m.vtrk.timeScale)
+	return
+}
+
 func Open(path string) (m *mp4, err error) {
 	m = &mp4{}
 	r, err := os.Open(path)
@@ -142,8 +164,6 @@ func Open(path string) (m *mp4, err error) {
 		return
 	}
 	m.Dur = float32(m.vtrk.dur) / float32(m.vtrk.timeScale)
-	//l.Printf("atoms:")
-	//m.dumpAtoms(m.atom, 0)
 	return
 }
 
@@ -191,150 +211,8 @@ func (m *mp4) wrAtom(w io.Writer, a *mp4atom) {
 	}
 }
 
-func (m *mp4) DumpTest(outpath string) (err error) {
-	// Need modify atoms:
-	//  stts: duration array
-	//  stsc: defines index count between [chunk#1, chunk#2]
-	//  stco: chunkOffs
-	//  stsz: sampleSizes
-	//  stss: keyFrames
-
-	pos := float32(120)
-	minOffStart := int64(2) << 40
-
-	m.vtrk.newIdx = searchIndex(pos, m.vtrk, true)
-	newpos := m.vtrk.index[m.vtrk.newIdx].Pos
-	m.log("adjust pos %v -> %v", pos, newpos)
-	pos = newpos
-
-	for _, t := range m.Trk {
-		m.logindent = 0
-		m.log("trk")
-		m.logindent = 1
-
-		var ii int
-		if t.newIdx != 0 {
-			ii = t.newIdx
-		} else {
-			ii = searchIndex(pos, t, true)
-			if ii == 0 {
-				ii = searchIndex(pos, t, false)
-			}
-		}
-
-		t.offStart = t.index[ii].Off
-		t.newSampleSizes = t.sampleSizes[ii:]
-		m.log("ii %d/%d", ii, len(t.sampleSizes))
-		m.log("offStart %d", t.offStart)
-
-		m.log("dur %d -> %d", t.dur, t.dur-t.index[ii].Ts)
-		t.dur -= t.index[ii].Ts
-		m.Dur = float32(t.dur) / float32(t.timeScale)
-
-		if t.offStart < minOffStart {
-			minOffStart = t.offStart
-		}
-
-		if len(t.keyFrames) > 0 {
-			ik := 0
-			for i, s := range t.keyFrames {
-				if s >= ii {
-					ik = i
-					break
-				}
-			}
-			t.newKeyFrames = t.keyFrames[ik:]
-			for i := 1; i < len(t.newKeyFrames); i++ {
-				t.newKeyFrames[i] -= t.newKeyFrames[0] - 1
-			}
-			t.newKeyFrames[0] = 1
-			m.log("keyFrames %v", t.newKeyFrames[:10])
-			m.log("keyFrames %d/%d", ik, len(t.keyFrames))
-		}
-
-		iStts := 0
-		cnt := 0
-		for i, s := range t.stts {
-			cnt += s.cnt
-			if cnt >= ii {
-				break
-			}
-			iStts = i
-		}
-		t.newStts = t.stts[iStts:]
-		m.log("iStts %d/%d", iStts, len(t.stts))
-
-		//m.log("probestsc %v", t.stsc)
-		m.sumStsc(t.stsc, t.chunkOffs)
-		iStsc := 0
-		iStco := 0
-		cnt = 0
-		ci := 0
-		for ki := range t.chunkOffs {
-			for ci+1 < len(t.stsc) && ki+1 == t.stsc[ci+1].first {
-				ci++
-			}
-			cnt += t.stsc[ci].cnt
-			//m.log("probe stsc %d #%d ki %d", cnt, ci, ki)
-			if cnt >= ii {
-				iStsc = ci
-				iStco = ki
-				cnt -= t.stsc[ci].cnt
-				break
-			}
-		}
-		if iStco+1 == t.stsc[iStsc].first {
-			t.newStsc = make([]mp4stsc, len(t.stsc)-iStsc)
-			copy(t.newStsc, t.stsc[iStsc:])
-			t.newStsc[0].cnt -= ii - cnt
-		} else {
-			t.newStsc = make([]mp4stsc, len(t.stsc)-iStsc+1)
-			copy(t.newStsc[1:], t.stsc[iStsc:])
-			t.newStsc[0] = t.newStsc[1]
-			t.newStsc[0].cnt -= ii - cnt
-			t.newStsc[0].first = iStco + 1
-			t.newStsc[1].first = iStco + 2
-		}
-		for i := 0; i < len(t.newStsc); i++ {
-			t.newStsc[i].first -= iStco
-		}
-
-		t.newChunkOffs = make([]int64, len(t.chunkOffs)-iStco)
-		copy(t.newChunkOffs, t.chunkOffs[iStco:])
-		t.newChunkOffs[0] = t.offStart
-		//m.log("newChunkOffs %v", t.newChunkOffs)
-		m.log("iStsc %d/%d", iStsc, len(t.stsc))
-		m.log("iStso %d/%d", iStco, len(t.chunkOffs))
-
-		m.log("newStsc %v sum %d", t.newStsc, m.sumStsc(t.newStsc, t.newChunkOffs))
-		m.log("newChunkOffs cnt %d", len(t.newChunkOffs))
-		m.log("newSampleSizes cnt %d", len(t.newSampleSizes))
-	}
-
-	m.logindent = 0
-	m.log("gen file")
-	var b bytes.Buffer
-	m.wrAtom(&b, m.atom)
-	newOff := int64(b.Len()) + 8
-	m.log("newOff %d minOff %d", newOff, minOffStart)
-	st, _ := m.rat.Stat()
-	newMdatSize := st.Size() - minOffStart
-
-	m.mdatOff = -minOffStart + newOff
-	b.Reset()
-	m.wrAtom(&b, m.atom)
-
-	f, _ := os.Create("/tmp/a.mp4")
-	f.Write(b.Bytes())
-	WriteInt(f, int(newMdatSize)+8, 4)
-	WriteString(f, "mdat")
-	m.rat.Seek(minOffStart, os.SEEK_SET)
-	io.Copy(f, m.rat)
-	f.Close()
-
-	return
-}
-
 func (m *mp4) closeReader() {
-	m.rat.Close()
+	if closer, ok := m.rat.(io.Closer); ok {
+		closer.Close()
+	}
 }
